@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>The Nykaa Data Bridge</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+<style>
+  :root {
+    --bg-color: #f8fafc;
+    --primary: #e11471; /* Nykaa Pink-ish */
+    --success: #10b981;
+    --error: #ef4444;
+    --sheet-bg: #ffffff;
+    --sheet-border: #cbd5e1;
+  }
+
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg-color);
+    text-align: center;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: pan-y;
+  }
+
+  h1 { color: #1e293b; margin-bottom: 5px; font-weight: 800; font-size: 24px; }
+  h2 { color: var(--primary); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+  p { color: #64748b; margin-top: 0; font-size: 15px; max-width: 600px; line-height: 1.4; }
+
+  /* HUMAN CHAOS AREA (The messy input) */
+  .chaos-box {
+    background: #fef9c3;
+    border-left: 5px solid #eab308;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin: 20px 0;
+    width: 100%;
+    max-width: 850px;
+    text-align: left;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    font-family: 'Inter', sans-serif;
+    color: #451a03;
+    font-size: 14px;
+    box-sizing: border-box;
+  }
+
+  .chaos-box strong { font-size: 12px; text-transform: uppercase; color: #a16207; display: block; margin-bottom: 8px;}
+  
+  .chaos-table { width: 100%; border-collapse: collapse; margin-top: 5px; background: rgba(255,255,255,0.5); }
+  .chaos-table th, .chaos-table td { border: 1px dashed #ca8a04; padding: 8px; text-align: left; vertical-align: top; }
+  .chaos-table th { font-size: 12px; color: #854d0e; }
+
+  /* SPREADSHEET AREA */
+  .spreadsheet {
+    width: 100%;
+    max-width: 900px;
+    background: var(--sheet-bg);
+    border: 1px solid var(--sheet-border);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1);
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .sheet-header, .sheet-row {
+    display: grid;
+    /* 6 columns to include Content ID */
+    grid-template-columns: 0.8fr 1fr 1fr 1.2fr 1.2fr 0.8fr; 
+  }
+
+  .sheet-header {
+    background: #f1f5f9;
+    border-bottom: 2px solid var(--sheet-border);
+    font-weight: bold;
+    font-size: 12px;
+    color: #475569;
+  }
+
+  .sheet-row { min-height: 80px; }
+
+  .cell-header, .cell {
+    padding: 10px;
+    border-right: 1px solid var(--sheet-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cell-header:last-child, .cell:last-child { border-right: none; }
+
+  .cell { background: #fafafa; transition: background 0.2s; }
+  .cell.drag-over { background: #fce7f3; }
+
+  /* DATA PILLS (Draggable items) */
+  .pill {
+    background: #fff;
+    border: 1px solid #94a3b8;
+    color: #334155;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: grab;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    text-align: center;
+    word-break: break-word;
+    max-width: 90%;
+    touch-action: none;
+    font-family: 'Inter', monospace;
+  }
+  .pill:active { cursor: grabbing; transform: scale(0.95); }
+  .pill i { margin-right: 5px; color: var(--primary); }
+
+  /* The pool where pills start */
+  .data-pool {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    width: 100%;
+    max-width: 900px;
+    background: #e2e8f0;
+    padding: 20px;
+    border-radius: 12px;
+    box-sizing: border-box;
+    min-height: 120px;
+  }
+
+  /* CONTROLS */
+  .controls { margin-top: 20px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+  button {
+    padding: 12px 24px;
+    font-size: 15px;
+    font-weight: bold;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .run { background: #1e293b; color: white; box-shadow: 0 4px 0 #0f172a; }
+  .run:hover { transform: translateY(-2px); box-shadow: 0 6px 0 #0f172a; }
+  .run:active { transform: translateY(2px); box-shadow: 0 0 0 #0f172a; }
+  .run.success { background: var(--success); box-shadow: 0 4px 0 #15803d; pointer-events: none; }
+  .reset { background: white; color: var(--error); border: 2px solid var(--error); }
+  .next-level { background: var(--primary); color: white; box-shadow: 0 4px 0 #be125e; display: none; }
+
+  .status-bar { margin-top: 15px; height: 20px; font-weight: 600; color: #64748b; font-size: 14px; }
+
+  /* Animations */
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+  .shake { animation: shake 0.4s ease-in-out; border: 2px solid var(--error) !important; }
+  @keyframes pop { 0% { transform: scale(0.8); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+  .pop { animation: pop 0.3s ease-out; }
+
+  #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+  .hidden { display: none !important; }
+
+  /* Mobile responsiveness */
+  @media (max-width: 768px) {
+    .sheet-header, .sheet-row { grid-template-columns: 1fr; }
+    .sheet-row { min-height: auto; }
+    .cell-header { display: none; } /* Hide horizontal headers */
+    .cell { min-height: 60px; border-bottom: 2px dashed #cbd5e1; border-right: none;}
+    .cell:last-child { border-bottom: none; }
+    .cell::before {
+      content: attr(data-column);
+      position: absolute;
+      font-size: 10px;
+      color: #94a3b8;
+      top: 5px;
+      left: 10px;
+    }
+    .cell { position: relative; padding-top: 25px; }
+    
+    .chaos-table th, .chaos-table td { display: block; width: 100%; border: none; border-bottom: 1px dashed #ca8a04; }
+    .chaos-table th { display: none; }
+    .chaos-table td::before { content: attr(data-label) ": "; font-weight: bold; color: #854d0e; }
+  }
+</style>
+
+<script src="https://bernardo-castilho.github.io/DragDropTouch/DragDropTouch.js"></script>
+
+</head>
+
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+
+<h1>🌉 The Nykaa Data Bridge</h1>
+<h2 id="level-indicator">Row 1 of 3</h2>
+<p>Drag the <b>automation-ready</b> data into the database. Beware of bad formats and typos!</p>
+
+<div class="chaos-box" id="chaos-box">
+  </div>
+
+<div class="spreadsheet">
+  <div class="sheet-header">
+    <div class="cell-header">Content_ID</div>
+    <div class="cell-header">Brand</div>
+    <div class="cell-header">Publish_Date</div>
+    <div class="cell-header">Media_URL</div>
+    <div class="cell-header">Caption</div>
+    <div class="cell-header">Status</div>
+  </div>
+  <div class="sheet-row" id="db-row">
+    <div class="cell" data-column="Content_ID"></div>
+    <div class="cell" data-column="Brand"></div>
+    <div class="cell" data-column="Publish_Date"></div>
+    <div class="cell" data-column="Media_URL"></div>
+    <div class="cell" data-column="Caption"></div>
+    <div class="cell" data-column="Status"></div>
+  </div>
+</div>
+
+<div class="data-pool" id="pool-area">
+  </div>
+
+<div class="status-bar" id="status-text">Map the data to the correct columns...</div>
+
+<div class="controls">
+  <button class="reset" onclick="resetLevel()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+  <button class="run" id="run-btn" onclick="runAudit()"><i class="fa-solid fa-robot"></i> Run Robot Audit</button>
+  <button class="next-level" id="next-btn" onclick="nextLevel()">Next Row <i class="fa-solid fa-arrow-right"></i></button>
+</div>
+
+<script>
+  // --- LEVEL DATA ---
+  const levels = [
+    {
+      id: 1,
+      chaosText: `
+        <strong>Human Input: Row 1</strong>
+        <table class="chaos-table">
+          <tr><th>Brand</th><th>What are we posting?</th><th>When?</th><th>The Goodies (Media)</th><th>Notes for the Team</th></tr>
+          <tr>
+            <td data-label="Brand">Maybelline</td>
+            <td data-label="What">Foundation Tutorial Reel</td>
+            <td data-label="When">Next Monday morning</td>
+            <td data-label="Media">maybelline_final_v2.mp4 (in the 'Summer' Drive folder)</td>
+            <td data-label="Notes">Use the caption: "Get that glow! ✨ #NykaaSummer"</td>
+          </tr>
+        </table>
+      `,
+      solution: {
+        "Content_ID": "NYK-SUM-01",
+        "Brand": "Maybelline",
+        "Publish_Date": "2026-03-02",
+        "Media_URL": "https://cdn.nyka.com/summer/maybelline_final_v2.mp4",
+        "Caption": "Get that glow! ✨ #NykaaSummer",
+        "Status": "Draft"
+      },
+      pills: [
+        { val: "NYK-SUM-01", type: "Content_ID" },
+        { val: "Maybelline 01", type: "Content_ID", bad: true },
+        { val: "Maybelline", type: "Brand" },
+        { val: "2026-03-02", type: "Publish_Date" },
+        { val: "Next Monday", type: "Publish_Date", bad: true },
+        { val: "https://cdn.nyka.com/summer/maybelline_final_v2.mp4", type: "Media_URL" },
+        { val: "maybelline_final_v2.mp4", type: "Media_URL", bad: true },
+        { val: "Get that glow! ✨ #NykaaSummer", type: "Caption" },
+        { val: "Use the caption: Get that glow! ✨", type: "Caption", bad: true },
+        { val: "Draft", type: "Status" },
+        { val: "In Review", type: "Status", bad: true } // Trick: The notes don't say waiting!
+      ]
+    },
+    {
+      id: 2,
+      chaosText: `
+        <strong>Human Input: Row 2</strong>
+        <table class="chaos-table">
+          <tr><th>Brand</th><th>What are we posting?</th><th>When?</th><th>The Goodies (Media)</th><th>Notes for the Team</th></tr>
+          <tr>
+            <td data-label="Brand">L'Oreal</td>
+            <td data-label="What">Shampoo Carousel</td>
+            <td data-label="When">ASAP!!!</td>
+            <td data-label="Media">loreal_1.jpg, loreal_2.jpg</td>
+            <td data-label="Notes">Tag @lorealindia. Status is currently 'Waiting for approval' from the brand.</td>
+          </tr>
+        </table>
+      `,
+      solution: {
+        "Content_ID": "NYK-LOR-01",
+        "Brand": "L'Oreal",
+        "Publish_Date": "2026-02-24", // Assuming today is Feb 24, 2026
+        "Media_URL": "https://cdn.nyka.com/loreal_1.jpg",
+        "Caption": "@lorealindia",
+        "Status": "In Review"
+      },
+      pills: [
+        { val: "NYK-LOR-01", type: "Content_ID" },
+        { val: "L'Oreal", type: "Brand" },
+        { val: "2026-02-24", type: "Publish_Date" },
+        { val: "ASAP!!!", type: "Publish_Date", bad: true }, 
+        { val: "https://cdn.nyka.com/loreal_1.jpg", type: "Media_URL" },
+        { val: "loreal_1.jpg", type: "Media_URL", bad: true }, 
+        { val: "@lorealindia", type: "Caption" },
+        { val: "Tag @lorealindia", type: "Caption", bad: true }, 
+        { val: "In Review", type: "Status" },
+        { val: "Waiting for approval", type: "Status", bad: true }
+      ]
+    },
+    {
+      id: 3,
+      chaosText: `
+        <strong>Human Input: Row 3</strong>
+        <table class="chaos-table">
+          <tr><th>Brand</th><th>What are we posting?</th><th>When?</th><th>The Goodies (Media)</th><th>Notes for the Team</th></tr>
+          <tr>
+            <td data-label="Brand">The Ordinary</td>
+            <td data-label="What">Serum Static Post</td>
+            <td data-label="When">April 15th</td>
+            <td data-label="Media">serum_shot.png</td>
+            <td data-label="Notes">This is a high-priority post. Needs to go to IG and LinkedIn.</td>
+          </tr>
+        </table>
+      `,
+      solution: {
+        "Content_ID": "NYK-ORD-01",
+        "Brand": "The Ordinary",
+        "Publish_Date": "2026-04-15",
+        "Media_URL": "https://cdn.nyka.com/serum_shot.png",
+        "Caption": "This is a high-priority post.",
+        "Status": "Draft" // No explicit approval/review note
+      },
+      pills: [
+        { val: "NYK-ORD-01", type: "Content_ID" },
+        { val: "The Ordinary", type: "Brand" },
+        { val: "2026-04-15", type: "Publish_Date" },
+        { val: "April 15th", type: "Publish_Date", bad: true }, 
+        { val: "https://cdn.nyka.com/serum_shot.png", type: "Media_URL" },
+        { val: "This is a high-priority post.", type: "Caption" },
+        { val: "Needs to go to IG and LinkedIn.", type: "Caption", bad: true }, 
+        { val: "Draft", type: "Status" },
+        { val: "Approved", type: "Status", bad: true }
+      ]
+    }
+  ];
+
+  let currentLevelIndex = 0;
+  let dragged = null;
+
+  const levelIndicator = document.getElementById("level-indicator");
+  const chaosBox = document.getElementById("chaos-box");
+  const poolArea = document.getElementById("pool-area");
+  const cells = document.querySelectorAll(".cell");
+  const statusText = document.getElementById("status-text");
+  const runBtn = document.getElementById("run-btn");
+  const nextBtn = document.getElementById("next-btn");
+
+  function loadLevel(index) {
+    if (index >= levels.length) return showVictoryScreen();
+
+    const level = levels[index];
+    currentLevelIndex = index;
+    
+    levelIndicator.innerText = `Row ${level.id} of ${levels.length}`;
+    chaosBox.innerHTML = level.chaosText;
+    statusText.innerText = "Map the data to the correct columns...";
+    statusText.style.color = "#64748b";
+
+    runBtn.classList.remove("hidden", "success");
+    runBtn.innerHTML = '<i class="fa-solid fa-robot"></i> Run Robot Audit';
+    nextBtn.style.display = "none";
+
+    cells.forEach(cell => {
+      cell.innerHTML = "";
+      cell.classList.remove("shake", "pop");
+      cell.style.borderColor = "var(--sheet-border)";
+    });
+
+    poolArea.innerHTML = "";
+    const shuffled = [...level.pills].sort(() => Math.random() - 0.5);
+    
+    shuffled.forEach(p => {
+      const pill = document.createElement("div");
+      pill.classList.add("pill");
+      pill.draggable = true;
+      pill.dataset.val = p.val;
+      
+      let icon = "fa-font";
+      if(p.type === "Content_ID") icon = "fa-barcode";
+      if(p.type === "Publish_Date") icon = "fa-calendar-day";
+      if(p.type === "Media_URL") icon = "fa-link";
+      if(p.type === "Status") icon = "fa-clipboard-check";
+      
+      pill.innerHTML = `<i class="fa-solid ${icon}"></i> ${p.val}`;
+      poolArea.appendChild(pill);
+    });
+
+    bindDragEvents();
+  }
+
+  function bindDragEvents() {
+    document.querySelectorAll(".pill").forEach(p => {
+      p.addEventListener("dragstart", () => { dragged = p; p.style.opacity = '0.5'; });
+      p.addEventListener("dragend", () => { p.style.opacity = '1'; });
+    });
+
+    cells.forEach(cell => {
+      cell.addEventListener("dragover", e => { e.preventDefault(); cell.classList.add("drag-over"); });
+      cell.addEventListener("dragleave", () => { cell.classList.remove("drag-over"); });
+      cell.addEventListener("drop", () => {
+        cell.classList.remove("drag-over");
+        
+        // FIX: Specifically look for the pill element, not just the firstChild
+        const existingPill = cell.querySelector(".pill");
+        if (existingPill) { poolArea.appendChild(existingPill); }
+        
+        if (dragged) {
+          cell.appendChild(dragged);
+          dragged.classList.add("pop");
+          statusText.innerText = "Data mapped.";
+        }
+      });
+    });
+  }
+
+  function runAudit() {
+    const level = levels[currentLevelIndex];
+    let allCorrect = true;
+    let emptyCells = false;
+
+    cells.forEach(cell => {
+      const colName = cell.dataset.column;
+      const expectedVal = level.solution[colName];
+      const pill = cell.querySelector(".pill"); // FIX: Specifically look for the pill
+
+      if (!pill) {
+        emptyCells = true;
+        cell.classList.add("shake");
+      } else if (pill.dataset.val !== expectedVal) {
+        allCorrect = false;
+        cell.classList.add("shake");
+        
+        // Contextual Error Feedback
+        if(colName === "Content_ID") statusText.innerText = "❌ Error: ID must follow a strict naming convention (e.g. NYK-SUM-01).";
+        else if(colName === "Publish_Date") statusText.innerText = "❌ Error: Robots need dates in YYYY-MM-DD format!";
+        else if(colName === "Media_URL") statusText.innerText = "❌ Error: A file name is not a URL. Create a digital link!";
+        else if(colName === "Caption") statusText.innerText = "❌ Error: Strip away the notes! Only include the final text/tags.";
+        else if(colName === "Status") statusText.innerText = "❌ Error: Status must be exact (Draft, In Review, Approved). Check the notes!";
+        else statusText.innerText = `❌ Error in ${colName} column.`;
+      } else {
+        cell.style.borderColor = "var(--success)";
+      }
+    });
+
+    setTimeout(() => { cells.forEach(c => c.classList.remove("shake")); }, 500);
+
+    if (emptyCells) {
+      statusText.innerText = "❌ Error: Please fill all columns before auditing.";
+      statusText.style.color = "var(--error)";
+      return;
+    }
+    if (!allCorrect) {
+      statusText.style.color = "var(--error)";
+      return;
+    }
+
+    statusText.innerText = "✅ Audit Passed! Row is Automation-Ready.";
+    statusText.style.color = "var(--success)";
+    runBtn.classList.add("hidden");
+    nextBtn.style.display = "flex";
+    fireConfetti();
+  }
+
+  // --- THE RESET FIX ---
+  function resetLevel() {
+    cells.forEach(cell => {
+      // FIX: Grab the pill specifically, to avoid empty HTML text nodes
+      const pill = cell.querySelector(".pill");
+      if (pill) { 
+        pill.classList.remove("pop"); // Clean up animation classes
+        poolArea.appendChild(pill); 
+      }
+      cell.style.borderColor = "var(--sheet-border)";
+    });
+    
+    statusText.innerText = "Map the data to the correct columns...";
+    statusText.style.color = "#64748b";
+
+    // FIX: Ensure run button comes back if reset is clicked after a successful run
+    runBtn.classList.remove("hidden");
+    nextBtn.style.display = "none";
+  }
+
+  function nextLevel() {
+    currentLevelIndex++;
+    loadLevel(currentLevelIndex);
+  }
+
+  function showVictoryScreen() {
+    document.querySelector(".spreadsheet").style.display = "none";
+    chaosBox.style.display = "none";
+    poolArea.style.display = "none";
+    document.querySelector('.controls').style.display = 'none';
+    
+    document.getElementById("level-indicator").innerText = "Activity Complete";
+    document.querySelector("p").innerHTML = `
+      <div style="padding:20px; text-align:center;">
+        <i class="fa-solid fa-database" style="font-size: 50px; color: var(--success); margin-bottom:15px;"></i>
+        <h2>Data Architect Certified!</h2>
+        <p style="margin: 0 auto;">You successfully translated the Human Chaos into a clean, automation-ready database.</p>
+        <button onclick="location.reload()" style="margin: 20px auto; background: var(--primary); color: white;">Restart Activity</button>
+      </div>
+    `;
+    fireConfetti();
+  }
+
+  let particles = [];
+  const ctx = document.getElementById("confetti-canvas").getContext("2d");
+  function fireConfetti() {
+    const canvas = document.getElementById("confetti-canvas");
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    particles = [];
+    for(let i=0; i<100; i++) {
+      particles.push({
+        x: window.innerWidth / 2, y: window.innerHeight / 2,
+        vx: (Math.random() - 0.5) * 15, vy: (Math.random() - 0.5) * 15 - 5,
+        color: `hsl(${Math.random() * 360}, 100%, 50%)`, life: 100, gravity: 0.2
+      });
+    }
+    requestAnimationFrame(animateConfetti);
+  }
+  function animateConfetti() {
+    if(particles.length === 0) return;
+    const canvas = document.getElementById("confetti-canvas");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach((p, i) => {
+      p.x += p.vx; p.y += p.vy; p.vy += p.gravity; p.life--;
+      ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 8, 8);
+      if(p.life <= 0) particles.splice(i, 1);
+    });
+    if(particles.length > 0) requestAnimationFrame(animateConfetti);
+  }
+  window.addEventListener('resize', () => {
+    document.getElementById("confetti-canvas").width = window.innerWidth;
+    document.getElementById("confetti-canvas").height = window.innerHeight;
+  });
+
+  loadLevel(0);
+</script>
+</body>
+</html>
